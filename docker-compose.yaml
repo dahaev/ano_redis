@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  ano_app:
+      build:
+        context: ./redis_app
+      ports:
+        - 8000:8000
+      restart: always
+      image: ano_app:django
+      command: ["python", "./src/manage.py", "runserver", "0.0.0.0:8000"]
+      container_name: ano_app
+      depends_on:
+        - db
+  redis:
+    image: redis
+    container_name: redis
+    restart: always
+  db: 
+    image: postgres
+    environment:
+      - POSTGRES_DB=redis_ano
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=shisik
+    container_name: ANO_DATABASE
+    restart: always
+    ports:
+      - 5432:5432
+  PGadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: root@root.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "5050:80"
+  worker_redis: 
+    container_name: worker_1
+    build: 
+      context: ./redis_app
+    restart: always
+    command: ["celery", "--workdir=./src", "-A", "ano_app", "worker"]
+    depends_on:
+      - ano_app
+      - db
+    links: 
+      - redis:redis
+      - db
+  flower-monitor:
+    container_name: flower_monitor
+    build:
+      context: ./redis_app
+    command: ["celery", "--workdir=./src", "-A", "ano_app", "flower"]
+    ports:
+      - 5555:5555
+    depends_on:
+      - worker_redis
+      - redis
+
